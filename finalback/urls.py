@@ -100,6 +100,18 @@ urlpatterns = [
     path('coach_info/<int:pk>/',views.coach_info),
     path('arbitrator_info/<int:pk>/',views.arbitrator_info),
     path('supporter_info/<int:pk>/',views.supporter_info),
+    path('arbitrator_by_licence/<str:pk>/',views.arbitrator_by_licence),
+    path('comp_arbitrator_list/',views.comp_arbitrator_list),
+    path('participant_by_licence/<str:pk>/',views.participant_by_licence),
+
+    path('comp_participants_list/',views.comp_participants_list),
+    path('comp_list_info/',views.comp_list_info),
+    path('add_matches/',views.addMatches),
+    path('submit_result/<int:pk>/',views.submitResult),
+    path('clubs_list/',views.clubsList)
+
+
+
 
 
 

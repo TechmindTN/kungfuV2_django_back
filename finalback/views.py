@@ -89,12 +89,17 @@ def serialize_user(user):
         "username": user.username,
         "email": user.email,
         "first_name": user.first_name,
-        "last_name": user.last_name
+        "last_name": user.last_name,
+        "is_superuser":user.is_superuser
         
     }
 
 
-
+def check_admin(userid):
+    print(userid)
+    user=User.objects.filter(id=userid).first()
+    return user.is_superuser
+        
 
 @api_view(['POST'])
 def login(request):
@@ -381,7 +386,7 @@ class LicencesList(generics.ListCreateAPIView):
 class LicencesDetail(generics.RetrieveUpdateDestroyAPIView):
     queryset = Licences.objects.all()
     serializer_class = LicencesSerializer
-    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+    # permission_classes = [permissions.IsAuthenticatedOrReadOnly]
 
 
 class GradeList(generics.ListCreateAPIView):
@@ -546,6 +551,8 @@ def parameters(request):
             disciplineSerializer = DisciplineSerializer(disciplins, many=True)
             r = role.objects.all()
             roleSerializer = RoleSerializer(r, many=True)
+            ligue = Ligue.objects.all()
+            ligueSerializer = LigueSerializer(ligue, many=True)
                         
             parameters={
                         "Grades":gradesSerializer.data,
@@ -555,7 +562,8 @@ def parameters(request):
                         "Seasons":seasonSerializer.data,
                         "Clubs":clubSerializer.data,
                         "Disciplines":disciplineSerializer.data,
-                        "Roles":roleSerializer.data
+                        "Roles":roleSerializer.data,
+                        "Ligues":ligueSerializer.data
                         }
             return JsonResponse(parameters,safe=False)
         except Exception as e:
@@ -598,7 +606,7 @@ def verify_licence(request, pk):
      
      
 @api_view(['PUT'])
-@permission_classes([permissions.IsAuthenticated])
+# @permission_classes([permissions.IsAuthenticated])
 @csrf_exempt
 def validate_licence(request, pk):
     """
@@ -687,27 +695,105 @@ def add_licence(request):
     """
     Retrieve, update or delete a code Profile.
     """
-    try:
-        if request.method == 'POST':       
+    # try:
+    if request.method == 'POST':   
+            print(type(request.data['licence']['role']))    
             # try:
-                data=request.data
-                licences = Licences.objects.last()
-                num=str(int(licences.num_licences.split('-')[1])+1)
-                for i in range(len(num),10,1):
-                    num="0"+num
+            data=request.data['licence']
+            licences = Licences.objects.last()
+            num=str(int(licences.num_licences.split('-')[1])+1)
+            for i in range(len(num),10,1):
+                num="0"+num
                 
-                data['num_licences']='AT-'+num
-                licence=LicencesSerializer(data=request.data)
-                
-                if licence.is_valid():
-                    licence.save()
-                    return JsonResponse(licence.data,safe=False)
+            data['num_licences']='AT-'+num
+            licence=LicencesSerializer(data=request.data['licence'])
+            user =User.objects.filter(id=data['user']).first()
+            profile=Profile.objects.filter(user=user.pk).first()
+            print(profile.first_name)
+            photodata=request.data['photos']
+            # profileSerializer=ProfileSerializer(profile)
+            if data['role']==2:
+                athlete=Athlete.objects.filter(profile=profile.pk).first()
+                athleteSerializer=AthleteSerializer(athlete,data=photodata,partial=True)
+                if athleteSerializer.is_valid():
+                    
+                     
+            # if profileSerializer.is_valid():
+                    print('aaa')
+                    athleteSerializer.save()
+                    if licence.is_valid():
+                        print('bbb')
+                        licence.save()
+                        mapdata={
+                            'licence':licence.data,
+                            'photos':athleteSerializer.data
+                        }
+                        return JsonResponse(
+                            mapdata
+                            ,safe=False)
+                    else:
+                        return Response({'message':licenceserializer.errore},status=400)
+                        
                 else:
-                    return Response({'message':licenceserializer.errore},status=400)
-    except Exception as e:
-        return Response({'message':'There was a problem please try again later',
-                         'error':str(e)
-                         },status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                    return Response({'message':athleteSerializer.errore},status=400)
+            elif data['role']==1:
+                arbitrator=Arbitrator.objects.filter(profile=profile.pk).first()
+                arbitratorSerializer=ArbitratorSerializer(arbitrator,data=photodata,partial=True)
+                if arbitratorSerializer.is_valid():
+                    
+                     
+            # if profileSerializer.is_valid():
+                    print('aaa')
+                    arbitratorSerializer.save()
+                    if licence.is_valid():
+                        print('bbb')
+                        licence.save()
+                        mapdata={
+                            'licence':licence.data,
+                            'photos':arbitratorSerializer.data
+                        }
+                        return JsonResponse(
+                            mapdata
+                            ,safe=False)
+                    else:
+                        return Response({'message':licenceserializer.errore},status=400)
+                        
+                else:
+                    return Response({'message':arbitratorSerializer.errore},status=400)
+            
+            elif data['role']==4:
+                coach=Coach.objects.filter(profile=profile.pk).first()
+                coachSerializer=CoachSerializer(coach,data=photodata,partial=True)
+                if coachSerializer.is_valid():
+            
+                    
+                     
+            # if profileSerializer.is_valid():
+                    print('aaa')
+                    coachSerializer.save()
+                    if licence.is_valid():
+                        print('bbb')
+                        licence.save()
+                        mapdata={
+                            'licence':licence.data,
+                            'photos':coachSerializer.data
+                        }
+                        return JsonResponse(
+                            mapdata
+                            ,safe=False)
+            
+                    else:
+                        return Response({'message':licenceserializer.errore},status=400)
+                        
+                else:
+                    return Response({'message':coachSerializer.errore},status=400)
+            elif data['role']=="1":
+                print('ddddd')
+                return JsonResponse({"message":"aaaa"})    
+    # except Exception as e:
+    #     return Response({'message':'There was a problem please try again later',
+    #                      'error':str(e)
+    #                      },status=status.HTTP_500_INTERNAL_SERVER_ERROR)
              
             
             
@@ -782,34 +868,122 @@ def comp_info(request, pk):
     """
     Retrieve, update or delete a code Profile.
     """
-    try:
-        if request.method == 'GET':        
-            comp = Competition.objects.filter(id=pk).first()
-            compSerializer = CompetitionSerializer(comp, many=False)
-            tempdata=compSerializer.data
-            age = Categorie.objects.filter(id=comp.age.pk).first()
-            ageSerializer = CategorieSerializer(age, many=False)
-            tempdata['age']=age.categorie_age
-            season = Seasons.objects.filter(id=comp.season.pk).first()
-            seasonSerializer = SeasonsSerializer(season, many=False)
-            tempdata['season']=season.Seasons
-            ligue = Ligue.objects.filter(id=comp.ligue.pk).first()
-            ligueSerializer =LigueSerializer(ligue, many=False)
-            tempdata['ligue']=ligue.name
-            manager = User.objects.filter(id=comp.manager.pk).first()
-            userSerializer =UserSerializer(manager, many=False)
-            tempdata['manager']=manager.username
-            discipline = Discipline.objects.filter(id=comp.discipline.pk).first()
-            discSerializer =DisciplineSerializer(discipline, many=False)
-            tempdata['discipline']=discipline.name
-            return JsonResponse(tempdata,safe=False)
-    except Exception as e:
-        return JsonResponse({'message':'There was a problem please try again later',
-                             'error':str(e)
-                             },status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    # try:
+    if request.method == 'GET':        
+        comp = Competition.objects.filter(id=pk).first()
+        compSerializer = CompetitionSerializer(comp, many=False)
+        tempdata=compSerializer.data
+        age = Categorie.objects.filter(id=comp.age.pk).first()
+        ageSerializer = CategorieSerializer(age, many=False)
+        tempdata['age']=age.categorie_age
+        season = Seasons.objects.filter(id=comp.season.pk).first()
+        seasonSerializer = SeasonsSerializer(season, many=False)
+        tempdata['season']=season.Seasons
+        ligue = Ligue.objects.filter(id=comp.ligue.pk).first()
+        ligueSerializer =LigueSerializer(ligue, many=False)
+        tempdata['ligue']=ligue.name
+        manager = User.objects.filter(id=comp.manager.pk).first()
+        userSerializer =UserSerializer(manager, many=False)
+        tempdata['manager']=manager.username
+        discipline = Discipline.objects.filter(id=comp.discipline.pk).first()
+        discSerializer =DisciplineSerializer(discipline, many=False)
+        tempdata['discipline']=discipline.name
+        if tempdata['participants']!=[] and tempdata['participants']!=None:
+            tempparts=[]
+            for part in tempdata['participants']:
+                participant = Athlete.objects.filter(id=part).first()
+                partSerializer =AthleteSerializer(participant, many=False)
+                profile = Athlete.objects.filter(id=participant.profile.pk).first()
+                profileSerializer =ProfileSerializer(profile, many=False)
+                tempparts.append({'athlete':partSerializer.data,
+                            'profile':profileSerializer.data
+                            })
+            tempdata['participants']=tempparts
+        if tempdata['arbitrators']!=[] and tempdata['arbitrators']!=None:
+            temparbs=[]
+            for arb in tempdata['arbitrators']:
+                arbitrator = Arbitrator.objects.filter(id=arb).first()
+                arbitratorSerializer =ArbitratorSerializer(arbitrator, many=False)
+                profile = Athlete.objects.filter(id=arbitrator.profile.pk).first()
+                profileSerializer =ProfileSerializer(profile, many=False)
+                temparbs.append({'arbitrator':arbitratorSerializer.data,
+                            'profile':profileSerializer.data
+                            })
+            tempdata['arbitrators']=temparbs            
+            
+        return JsonResponse(tempdata,safe=False)
+        
+    # except Exception as e:
+    #     return JsonResponse({'message':'There was a problem please try again later',
+    #                          'error':str(e)
+    #                          },status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
             
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+@csrf_exempt
+def comp_list_info(request):
+    """
+    Retrieve, update or delete a code Profile.
+    """
+    # try:
+    if request.method == 'GET':   
+             
+        comps = Competition.objects.all()
+        tempDataList=[]
+        for comp in comps:
+            compSerializer = CompetitionSerializer(comp, many=False)
+            tempdata=compSerializer.data
+            if tempdata['age']!=None:
+                age = Categorie.objects.filter(id=comp.age.pk).first()
+                ageSerializer = CategorieSerializer(age, many=False)
+                tempdata['age']=age.categorie_age
+            if tempdata['season']!=None:
+                season = Seasons.objects.filter(id=comp.season.pk).first()
+                seasonSerializer = SeasonsSerializer(season, many=False)
+                tempdata['season']=season.Seasons
+            if tempdata['ligue']!=None:   
+                ligue = Ligue.objects.filter(id=comp.ligue.pk).first()
+                ligueSerializer =LigueSerializer(ligue, many=False)
+                tempdata['ligue']=ligue.name
+            if tempdata['manager']!=None:
+                manager = User.objects.filter(id=comp.manager.pk).first()
+                userSerializer =UserSerializer(manager, many=False)
+                tempdata['manager']=manager.username
+            if tempdata['discipline']!=None:
+                discipline = Discipline.objects.filter(id=comp.discipline.pk).first()
+                discSerializer =DisciplineSerializer(discipline, many=False)
+                tempdata['discipline']=discipline.name
             
+            if tempdata['participants']!=[] and tempdata['participants']!=None:
+                tempparts=[]
+                for part in tempdata['participants']:
+                    participant = Athlete.objects.filter(id=part).first()
+                    partSerializer =AthleteSerializer(participant, many=False)
+                    if partSerializer.data['profile']!=None:
+                        profile = Athlete.objects.filter(id=participant.profile.pk).first()
+                        profileSerializer =ProfileSerializer(profile, many=False)
+                        tempparts.append({'athlete':partSerializer.data,
+                                    'profile':profileSerializer.data
+                                    })
+                tempdata['participants']=tempparts
+            if tempdata['arbitrators']!=[] and tempdata['arbitrators']!=None:
+                temparbs=[]
+                for arb in tempdata['arbitrators']:
+                    arbitrator = Arbitrator.objects.filter(id=arb).first()
+                    arbitratorSerializer =ArbitratorSerializer(arbitrator, many=False)
+                    if arbitratorSerializer.data['profile']!=None:
+                        profile = Arbitrator.objects.filter(id=arbitrator.profile.pk).first()
+                        profileSerializer =ProfileSerializer(profile, many=False)
+                        temparbs.append({'arbitrator':arbitratorSerializer.data,
+                                    'profile':profileSerializer.data
+                                    })
+                tempdata['arbitrators']=temparbs
+            tempDataList.append(tempdata)            
+                
+        return JsonResponse(tempDataList,safe=False) 
 
 @api_view(['POST'])
 @permission_classes([permissions.IsAuthenticated])
@@ -904,7 +1078,7 @@ def licence_info(request, pk):
             userserializer = UserSerializer(user, many=False)
             profile = Profile.objects.filter(user=user.pk).first()
             profileSerializer =ProfileSerializer(profile, many=False)
-            tempdata['user']=profileSerializer.data
+            tempdata['profile']=profileSerializer.data
             if r!=None and profile!=None:
                         if r.pk==1:
                             arbitrator=Arbitrator.objects.filter(profile=profile.pk).first()
@@ -997,16 +1171,17 @@ def licence_info(request, pk):
                              },status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
     
-@api_view(['GET'])
-@permission_classes([permissions.IsAuthenticated])
+@api_view(['POST'])
+# @permission_classes([permissions.IsAuthenticated])
 @csrf_exempt
 def licencelist_info(request):
     """
     Retrieve, update or delete a code Profile.
     """
     try:
-        if request.method == 'GET':
+        if request.method == 'POST':
             tempdata=[]
+            
             licence = Licences.objects.all()
             if 'season' in request.data and request.data['season']!=None and request.data['season']!='': 
                 licence=licence.filter(seasons=request.data['season'])    
@@ -1016,7 +1191,7 @@ def licencelist_info(request):
                 licence=licence.filter(role=request.data['role'])    
             if 'user' in request.data and request.data['user']!=None and request.data['user']!='':
                 licence=licence.filter(user=request.data['user'])
-            if 'club' in request.data and request.data['club']!=None and request.data['club']!='':
+            if ('club' in request.data and request.data['club']!=None and request.data['club']!='') or check_admin(request.data['userid'])==False:
                 licence=licence.filter(club=request.data['club'])    
 
             licenceSerializer = LicencesSerializer(licence, many=True)
@@ -1087,7 +1262,15 @@ def licencelist_info(request):
 
                     tempdata[i]['profile']=profileSerializer.data
                 i=i+1
-        return JsonResponse(tempdata,safe=False)
+            return JsonResponse(tempdata,safe=False)
+        else:
+            return JsonResponse({
+                "message":"Method not allowed",
+                
+            },
+                                status=405
+                                
+                                )
     except Exception as e:
             return Response({'message':'There was a problem please try again later',
                              'error':str(e)
@@ -1145,7 +1328,7 @@ def add_club(request):
     
 
 @api_view(['PUT'])
-@permission_classes([permissions.IsAuthenticated])
+# @permission_classes([permissi ons.IsAuthenticated])
 @csrf_exempt
 def activate_season(request,pk):
     """
@@ -1523,16 +1706,27 @@ def filter_images(request):
 
     
     
-@api_view(['GET'])
-@permission_classes([permissions.IsAuthenticated])
+@api_view(['POST'])
 @csrf_exempt
 def athletelist_info(request):
     """
     Retrieve, update or delete a code Profile.
     """
     try:
-        if request.method == 'GET':   
+        if request.method == 'POST':   
             athletes=Athlete.objects.all()
+            if request.data:
+                if 'categorie' in request.data:
+                    if 'discipline' in request.data:                          
+                        athletes=Athlete.objects.filter(category_id=request.data['categorie'],discipline=request.data['discipline']).all()
+                    else:
+                        print(request.data['categorie'])
+                        athletes=Athlete.objects.filter(category_id=request.data['categorie']).all()
+                        print(athletes.count())
+                        for athlete in athletes :
+                            print(athlete)
+                # elif 'discipline' in request.data:
+                #     athletes=Athlete.objects.filter(discipline=request.data['discipline']).all()
             athleteSerializer=AthleteSerializer(athletes,many=True)
             tempdata=[]
             if athleteSerializer.is_valid:
@@ -1599,8 +1793,8 @@ def coachlist_info(request):
     """
     Retrieve, update or delete a code Profile.
     """
-    try:
-        if request.method == 'GET':   
+    # try:
+    if request.method == 'GET':   
             coaches=Coach.objects.all()
             coachSerializer=CoachSerializer(coaches,many=True)
             tempdata=[]
@@ -1625,8 +1819,8 @@ def coachlist_info(request):
                                         degree=Degree.objects.filter(id=c['degree']).first()
                                         degreeSerializer=DegreeSerializer(degree,many=False)
                                     #     print(degree.Degree)
-                                    if c['category']!=None:
-                                        category=Categorie.objects.filter(id=c['category']).first()
+                                    if c['category_id']!=None:
+                                        category=Categorie.objects.filter(id=c['category_id']).first()
                                         categorySerializer=CategorieSerializer(category,many=False)
                                     if c['weights']!=None:
                                         weights=Weights.objects.filter(id=c['weights']).first()
@@ -1644,7 +1838,8 @@ def coachlist_info(request):
                                     if c['degree']!=None:
                                         tempd['coach']['degree']=str(degree)
                                     tempd['coach']['category']=str(category)
-                                    tempd['coach']['weights']=str(weights)
+                                    if c['weights']!=None:
+                                        tempd['coach']['weights']=str(weights)
                                     tempd['coach']['club']=str(club)
                                     tempdata.append(tempd)
                                     
@@ -1656,22 +1851,28 @@ def coachlist_info(request):
             
             else:
                 return JsonResponse({"message":athleteSerializer.errors},status=400)
-    except Exception as e:
-        return JsonResponse({
-            "message":"There was a problem please try again later",
-            "error":str(e)},status=500)
+    # except Exception as e:
+        # return JsonResponse({
+        #     "message":"There was a problem please try again later",
+        #     "error":str(e)},status=500)
         
         
-@api_view(['GET'])
-@permission_classes([permissions.IsAuthenticated])
+@api_view(['POST'])
+# @permission_classes([permissions.IsAuthenticated])
 @csrf_exempt
 def arbitratorlist_info(request):
     """
     Retrieve, update or delete a code Profile.
     """
     try:
-        if request.method == 'GET':   
+        if request.method == 'POST':
+            # if check_admin(request.data['userid']):  
             arbitrators=Arbitrator.objects.all()
+            if request.data:
+                if 'grade' in request.data:
+                    arbitrators=Arbitrator.objects.filter(grade=request.data['grade'])
+                    
+            
             arbitratorSerializer=ArbitratorSerializer(arbitrators,many=True)
             tempdata=[]
             if arbitratorSerializer.is_valid:
@@ -1694,13 +1895,13 @@ def arbitratorlist_info(request):
                                     tempdata.append(tempd)
                                     
                                 else:
-                                    return JsonResponse({"message":userSerializer.errors},status=400)    
+                                    return JsonResponse({"message user":userSerializer.errors},status=400)    
                         else:
-                            return JsonResponse({"message":profileSerializer.errors},status=400)
+                            return JsonResponse({"message profile":profileSerializer.errors},status=400)
                 return JsonResponse(tempdata,safe=False)
             
             else:
-                return JsonResponse({"message":athleteSerializer.errors},status=400)
+                return JsonResponse({"message athlete":athleteSerializer.errors},status=400)
     except Exception as e:
         return JsonResponse({
             "message":"There was a problem please try again later",
@@ -2198,8 +2399,313 @@ def supporter_info(request,pk):
             "message":"There was a problem please try again later",
             "error":str(e)},status=500)
 
+
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+@csrf_exempt
+def arbitrator_by_licence(request,pk):
+    """
+    Retrieve, update or delete a code Profile.
+    """
+    # try:
+    if request.method == 'GET':  
+           licence=Licences.objects.filter(num_licences=pk).first()
+           profile=Profile.objects.filter(user=licence.user.pk).first()
+           arbitre=Arbitrator.objects.filter(profile=profile.pk).first()
+           return JsonResponse({'arbitrator':arbitre.pk})
+       
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+@csrf_exempt
+def arbitrators_list_by_licence(request):
+    """
+    Retrieve, update or delete a code Profile.
+    """
+    # try:
+    if request.method == 'GET':  
+        
+        arbs=request.data['licences']
+        tempdata=[]
+        for arb in arbs:
+            tempd={}
+            licence=Licences.objects.filter(num_licences=arb).first()
+            profile=Profile.objects.filter(user=licence.user.pk).first()
+            arbitrator=Arbitrator.objects.filter(profile=profile.pk).first()
+            tempd={'athlete':arbitrator,'profile':profile,'licence':licence}
+            tempdata.add(tempd)
+        return JsonResponse(tempdata,safe=False)     
+       
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+@csrf_exempt
+def participant_by_licence(request,pk):
+    """
+    Retrieve, update or delete a code Profile.
+    """
+    # try:
+    if request.method == 'GET':  
+           licence=Licences.objects.filter(num_licences=pk).first()
+           licenceSerializer=LicencesSerializer(licence)
+           profile=Profile.objects.filter(user=licence.user.pk).first()
+           profileSerializer=ProfileSerializer(profile)
+           athlete=Athlete.objects.filter(profile=profile.pk).first()
+           athleteSerializer=AthleteSerializer(athlete)
+           return JsonResponse({'athlete':athlete.pk},safe=False)
+        #    return JsonResponse({'athlete':athleteSerializer.data,'profile':profileSerializer.data,'licence':licenceSerializer.data},safe=False)
+           
+    # except Exception as e:
+    #     return JsonResponse({
+    #         "message":"There was a problem please try again later",
+    #         "error":str(e)},status=500)
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+@csrf_exempt
+def participant_list_by_licence(request):
+    """
+    Retrieve, update or delete a code Profile.
+    """
+    # try:
+    if request.method == 'GET':  
+        
+        parts=request.data['licences']
+        tempdata=[]
+        for part in parts:
+            tempd={}
+            licence=Licences.objects.filter(num_licences=part).first()
+            profile=Profile.objects.filter(user=licence.user.pk).first()
+            athlete=Athlete.objects.filter(profile=profile.pk).first()
+            tempd={'athlete':athlete,'profile':profile,'licence':licence}
+            tempdata.add(tempd)
+        return JsonResponse(tempdata,safe=False)     
          
-         
-         
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+@csrf_exempt
+def comp_arbitrator_list(request):
+    """
+    Retrieve, update or delete a code Profile.
+    """
+    # try:
+    if request.method == 'POST':
+        tempdata=[]
+        arbs=request.data['arbs']
+        for a in arbs:  
+            tempd={}
+            arbitrators=Arbitrator.objects.filter(id=a).first()
+            arbitratorSerializer=ArbitratorSerializer(arbitrators,many=False)
+            
+            if arbitratorSerializer.is_valid:
+                print('eeee')
+                
+                if arbitratorSerializer.data['profile']!=None:
+                    print('dddd')
+                    profile=Profile.objects.filter(id=arbitratorSerializer.data['profile']).first()
+                    profileSerializer=ProfileSerializer(profile,many=False)
+                    if profileSerializer.is_valid:
+                        print('cccc')
+                        if profileSerializer.data['user']!=None:
+                            user=User.objects.filter(id=profile.user.id).first()
+                            userSerializer=UserSerializer(user,many=False)
+                            print('bbbb')
+                            if userSerializer.is_valid:
+                                    
+                                tempd['profile']=profileSerializer.data
+                                tempd['user']=userSerializer.data
+                                tempd['arbitrator']=arbitratorSerializer.data
+                                tempdata.append(tempd)
+                                print('aaaaa')
+        return JsonResponse(tempdata,safe=False)                        
+                                    
+    #                         else:
+    #                             return JsonResponse({"message":userSerializer.errors},status=400)    
+    #                 else:
+    #                     return JsonResponse({"message":profileSerializer.errors},status=400)
+    #             return JsonResponse(tempd,safe=False)
+            
+    #         else:
+    #             return JsonResponse({"message":athleteSerializer.errors},status=400)
+    # except Exception as e:
+    #     return JsonResponse({
+    #         "message":"There was a problem please try again later",
+    #         "error":str(e)},status=500)
+           
+    # except Exception as e:
+    #     return JsonResponse({
+    #         "message":"There was a problem please try again later",
+    #         "error":str(e)},status=500)
+    
+    
+    
+    
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+@csrf_exempt
+def comp_participants_list(request):
+    """
+    Retrieve, update or delete a code Profile.
+    """
+    # try:
+    if request.method == 'POST':
+        tempdata=[]
+        parts=request.data['parts']
+        for a in parts:  
+            tempd={}
+            athletes=Athlete.objects.filter(id=a).first()
+            athleteSerializer=AthleteSerializer(athletes,many=False)
+            
+            if athleteSerializer.is_valid:
+                print('eeee')
+                
+                if athleteSerializer.data['profile']!=None:
+                    print('dddd')
+                    profile=Profile.objects.filter(id=athleteSerializer.data['profile']).first()
+                    profileSerializer=ProfileSerializer(profile,many=False)
+                    if profileSerializer.is_valid:
+                        print('cccc')
+                        if profileSerializer.data['user']!=None:
+                            user=User.objects.filter(id=profile.user.id).first()
+                            userSerializer=UserSerializer(user,many=False)
+                            print('bbbb')
+                            if userSerializer.is_valid:
+                                    
+                                tempd['profile']=profileSerializer.data
+                                tempd['user']=userSerializer.data
+                                tempd['athlete']=athleteSerializer.data
+                                tempdata.append(tempd)
+                                print('aaaaa')
+        return JsonResponse(tempdata,safe=False)       
+    
+    
+    
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+@csrf_exempt
+def addMatches(request):
+    """
+    Retrieve, update or delete a code Profile.
+    """
+    # try:
+    if request.method == 'POST':         
+        matches=request.data
+        matchesData=[]
+        for match in matches:
+            # matchSerializer=MatchSerializer(data=match)
+            # if matchSerializer.is_valid():
+                # matchSerializer.save()
+            result=Result()
+            resultData={
+                "winner":result.winner,
+                "p1_points":result.p1_points,
+                "p2_points":result.p2_points,
+                "duration":result.duration,
+                "notes":result.notes
+                
+            }
+            resultSerializer=ResultSerializer(data=resultData)
+            if resultSerializer.is_valid():
+                resultSerializer.save()
+                match['result']=resultSerializer.data['id']
+                matchSerializer=MatchSerializer(data=match)
+                if matchSerializer.is_valid():
+                    matchSerializer.save()
+                    tempdata=matchSerializer.data
+                    tempdata['result']=resultSerializer.data
+                    matchesData.append(tempdata)
+                else:
+                    return JsonResponse({"message match":matchSerializer.errors},status=400)  
+            else :
+                return JsonResponse({"message result":resultSerializer.errors},status=400)  
+        return JsonResponse(
+            matchesData,safe=False
+        )
+                
+                                    
+@api_view(['PUT'])
+@permission_classes([permissions.IsAuthenticated])
+@csrf_exempt
+def submitResult(request, pk):
+    """
+    Retrieve, update or delete a code Profile.
+    """
+    # try:
+    if request.method == 'PUT': 
+        matchData=request.data['match']
+        resultData=request.data['result']
+        match=Match.objects.filter(id=pk).first()
+        result=Result.objects.filter(id=match.result.pk).first()
+        match.status="Termine"
+        matchSerializer=MatchSerializer(match,data=matchData,partial=True)
+        if matchSerializer.is_valid():
+            matchSerializer.save()
+            resultSerializer=ResultSerializer(result,data=resultData,partial=True)
+            if resultSerializer.is_valid():
+                resultSerializer.save()
+                matchData=matchSerializer.data
+                matchData['result']=resultSerializer.data
+                return JsonResponse(matchData)  
+            
+            
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+@csrf_exempt
+def clubsList(request):
+    """
+    Retrieve, update or delete a code Profile.
+    """
+    # try:
+    if request.method == 'POST': 
+        userid=request.data['userid']
+        isAdmin=check_admin(userid)
+        if(isAdmin):
+            clubs=Club.objects.all()
+            clubsSerializer=ClubSerializer(clubs,many=True)
+            return JsonResponse(clubsSerializer.data,safe=False)
+        else:
+            return JsonResponse({'message':'Access Denied'},status=401,safe=False)
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+@csrf_exempt
+def addClub(request):
+    """
+    Retrieve, update or delete a code Profile.
+    """
+    # try:
+    if request.method == 'POST': 
+        userid=request.data['userid']
+        isAdmin=check_admin(userid)
+        if(isAdmin):
+            clubData
+            clubs=Club.objects.all()
+            clubsSerializer=ClubSerializer(clubs,many=True)
+            return JsonResponse(clubsSerializer.data,safe=False)
+        else:
+            return JsonResponse({'message':'Access Denied'},status=401,safe=False)        
+                         
+                              
+    #                         else:
+    #                             return JsonResponse({"message":userSerializer.errors},status=400)    
+    #                 else:
+    #                     return JsonResponse({"message":profileSerializer.errors},status=400)
+    #             return JsonResponse(tempd,safe=False)
+            
+    #         else:
+    #             return JsonResponse({"message":athleteSerializer.errors},status=400)
+    # except Exception as e:
+    #     return JsonResponse({
+    #         "message":"There was a problem please try again later",
+    #         "error":str(e)},status=500)
+           
+    # except Exception as e:
+    #     return JsonResponse({
+    #         "message":"There was a problem please try again later",
+    #         "error":str(e)},status=500)
+
 
          
