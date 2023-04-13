@@ -107,8 +107,12 @@ def login(request):
     serializer.is_valid(raise_exception=True)
     user = serializer.validated_data['user']
     _, token = AuthToken.objects.create(user)
+    profile=Profile.objects.filter(user=user.pk).first()
+    club=Club.objects.filter(profile=profile.pk).first()
+    clubSerializer=ClubSerializer(club,many=False)
     return Response({
         'user_data': serialize_user(user),
+        'club':clubSerializer.data,
         'token': token
     })
         
@@ -706,6 +710,8 @@ def add_licence(request):
                 num="0"+num
                 
             data['num_licences']='AT-'+num
+            activeSeason=Seasons.objects.filter(activated=True).first()
+            request.data['licence']['seasons']=activeSeason.pk
             licence=LicencesSerializer(data=request.data['licence'])
             user =User.objects.filter(id=data['user']).first()
             profile=Profile.objects.filter(user=user.pk).first()
@@ -821,6 +827,7 @@ def renew_licence(request, pk):
             licences = Licences.objects.filter(num_licences=pk).first()
             if licences.activated==True and licences.state=="Activee":
                 season=Seasons.objects.filter(id=licences.seasons.pk).first()
+                active_season=Seasons.objects.filter(activated=True).first()
                 if season.activated==False:      
                     archivedLicece=   {                 
                             "role":licences.role.pk,
@@ -839,19 +846,20 @@ def renew_licence(request, pk):
                     archiveSerializer= ArchivedLicencesSerializer(data=archivedLicece)
                     if archiveSerializer.is_valid():
                         archiveSerializer.save()
+                        request.data['seasons']=active_season.pk
                         licenceserializer = LicencesSerializer(licences,data=request.data, partial=True)                      
                         if licenceserializer.is_valid():
                             licenceserializer.save()
                             return JsonResponse(licenceserializer.data,safe=False)
                         else:
-                            return JsonResponse({'message':licenceserializer.errors})
+                            return JsonResponse({'message':licenceserializer.errors},status=400)
                     else:
                         print(archiveSerializer._errors)
                         return JsonResponse({'message':archiveSerializer._errors},status=400)
                 else:
-                    return JsonResponse({"active season":"You can't renew a licence from the activated season"})
+                    return JsonResponse({"active season":"You can't renew a licence from the activated season"},status=400)
             else:
-                return JsonResponse({"Inactive Licence":"You can't renew a licence with an inactive state"})
+                return JsonResponse({"Inactive Licence":"You can't renew a licence with an inactive state"},status=400)
     except Exception as e:
         return JsonResponse({'message':'There was a problem please try again later',
                                  "error":str(e)
@@ -1272,6 +1280,7 @@ def licencelist_info(request):
                                 
                                 )
     except Exception as e:
+            print(str(e))
             return Response({'message':'There was a problem please try again later',
                              'error':str(e)
                              },status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -1412,11 +1421,11 @@ def upload_photo(request):
             imageSerializer.save()
             return JsonResponse(imageSerializer.data)
         else:
-            return JsonResponse({"message":"Couldn't upload the image "+imageSerializer.errors})
+            return JsonResponse({"message":"Couldn't upload the image "+imageSerializer.errors},status=400)
     except Exception as e:
         return JsonResponse({"message":"There was a problem please try again",
                              "error": str(e)
-                             })
+                             },status=500)
 
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
@@ -1712,78 +1721,79 @@ def athletelist_info(request):
     """
     Retrieve, update or delete a code Profile.
     """
-    try:
-        if request.method == 'POST':   
-            athletes=Athlete.objects.all()
-            if request.data:
-                if 'categorie' in request.data:
-                    if 'discipline' in request.data:                          
-                        athletes=Athlete.objects.filter(category_id=request.data['categorie'],discipline=request.data['discipline']).all()
-                    else:
-                        print(request.data['categorie'])
-                        athletes=Athlete.objects.filter(category_id=request.data['categorie']).all()
-                        print(athletes.count())
-                        for athlete in athletes :
-                            print(athlete)
+    # try:
+    if request.method == 'POST':   
+        athletes=Athlete.objects.all()
+        if request.data:
+            if 'categorie' in request.data:
+                if 'discipline' in request.data:                          
+                    athletes=Athlete.objects.filter(category_id=request.data['categorie'],discipline=request.data['discipline']).all()
+                else:
+                    print(request.data['categorie'])
+                    athletes=Athlete.objects.filter(category_id=request.data['categorie']).all()
+                    print(athletes.count())
+                    for athlete in athletes :
+                        print(athlete)
                 # elif 'discipline' in request.data:
                 #     athletes=Athlete.objects.filter(discipline=request.data['discipline']).all()
-            athleteSerializer=AthleteSerializer(athletes,many=True)
-            tempdata=[]
-            if athleteSerializer.is_valid:
+        athleteSerializer=AthleteSerializer(athletes,many=True)
+        tempdata=[]
+        if athleteSerializer.is_valid:
                 
-                for a in athleteSerializer.data:
-                    if a['profile']!=None:
-                        tempd={}
-                        profile=Profile.objects.filter(id=a['profile']).first()
-                        profileSerializer=ProfileSerializer(profile,many=False)
-                        if profileSerializer.is_valid:
+            for a in athleteSerializer.data:
+                if a['profile']!=None:
+                    tempd={}
+                    profile=Profile.objects.filter(id=a['profile']).first()
+                    profileSerializer=ProfileSerializer(profile,many=False)
+                    if profileSerializer.is_valid:
                             
-                            if profileSerializer.data['user']!=None:
-                                user=User.objects.filter(id=profile.user.id).first()
-                                userSerializer=UserSerializer(user,many=False)
-                                if userSerializer.is_valid:
-                                    if a['grade_id']!=None:
-                                        grade=Grade.objects.filter(id=a['grade_id']).first()
-                                        gradeSerializer=GradeSerializer(grade,many=False)
-                                    if a['id_degree']!=None:
-                                        degree=Degree.objects.filter(id=a['id_degree']).first()
-                                        degreeSerializer=DegreeSerializer(degree,many=False)
+                        if profileSerializer.data['user']!=None:
+                            user=User.objects.filter(id=profile.user.id).first()
+                            userSerializer=UserSerializer(user,many=False)
+                            if userSerializer.is_valid:
+                                if a['grade_id']!=None:
+                                    grade=Grade.objects.filter(id=a['grade_id']).first()
+                                    gradeSerializer=GradeSerializer(grade,many=False)
+                                if a['id_degree']!=None:
+                                    degree=Degree.objects.filter(id=a['id_degree']).first()
+                                    degreeSerializer=DegreeSerializer(degree,many=False)
                                     #     print(degree.Degree)
-                                    if a['category_id']!=None:
-                                        category=Categorie.objects.filter(id=a['category_id']).first()
-                                        categorySerializer=CategorieSerializer(category,many=False)
-                                    if a['weights']!=None:
-                                        weights=Weights.objects.filter(id=a['weights']).first()
-                                        weightsSerializer=WeightSerializer(weights,many=False)
-                                    if a['club']!=None:
-                                        club=Club.objects.filter(id=a['club']).first()
-                                        clubSerializer=ClubSerializer(club,many=False)
+                                if a['category_id']!=None:
+                                    category=Categorie.objects.filter(id=a['category_id']).first()
+                                    categorySerializer=CategorieSerializer(category,many=False)
+                                if a['weights']!=None:
+                                    weights=Weights.objects.filter(id=a['weights']).first()
+                                    weightsSerializer=WeightSerializer(weights,many=False)
+                                if a['club']!=None:
+                                    club=Club.objects.filter(id=a['club']).first()
+                                    clubSerializer=ClubSerializer(club,many=False)
                                     
                                     
-                                    tempd['profile']=profileSerializer.data
-                                    tempd['user']=userSerializer.data
-                                    tempd['athlete']=a
-                                    if a['grade_id']!=None:
-                                        tempd['athlete']['grade_id']=str(grade)
-                                    if a['id_degree']!=None:
-                                        tempd['athlete']['id_degree']=str(degree)
+                                tempd['profile']=profileSerializer.data
+                                tempd['user']=userSerializer.data
+                                tempd['athlete']=a
+                                if a['grade_id']!=None:
+                                    tempd['athlete']['grade_id']=str(grade)
+                                if a['id_degree']!=None:
+                                    tempd['athlete']['id_degree']=str(degree)
+                                if a['category_id']!=None:    
                                     tempd['athlete']['category_id']=str(category)
-                                    tempd['athlete']['weights']=str(weights)
-                                    tempd['athlete']['club']=str(club)
-                                    tempdata.append(tempd)
+                                tempd['athlete']['weights']=str(weights)
+                                tempd['athlete']['club']=str(club)
+                                tempdata.append(tempd)
                                     
-                                else:
-                                    return JsonResponse({"message":userSerializer.errors},status=400)    
-                        else:
-                            return JsonResponse({"message":profileSerializer.errors},status=400)
-                return JsonResponse(tempdata,safe=False)
+                            else:
+                                return JsonResponse({"message":userSerializer.errors},status=400)    
+                    else:
+                        return JsonResponse({"message":profileSerializer.errors},status=400)
+            return JsonResponse(tempdata,safe=False)
             
-            else:
-                return JsonResponse({"message":athleteSerializer.errors},status=400)
-    except Exception as e:
-        return JsonResponse({
-            "message":"There was a problem please try again later",
-            "error":str(e)},status=500)
+        else:
+            return JsonResponse({"message":athleteSerializer.errors},status=400)
+    # except Exception as e:
+    #     return JsonResponse({
+    #         "message":"There was a problem please try again later",
+    #         "error":str(e)},status=500)
         
         
 @api_view(['GET'])
@@ -2686,7 +2696,304 @@ def addClub(request):
             clubsSerializer=ClubSerializer(clubs,many=True)
             return JsonResponse(clubsSerializer.data,safe=False)
         else:
-            return JsonResponse({'message':'Access Denied'},status=401,safe=False)        
+            return JsonResponse({'message':'Access Denied'},status=401,safe=False)       
+        
+        
+        
+        
+        
+        
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+@csrf_exempt
+def add_full_licence(request):
+    """
+    Retrieve, update or delete a code Profile.
+    """
+    # try:
+    if request.method == 'POST':   
+            print(type(request.data['licence']['role']))    
+            # try:
+            data=request.data['licence']
+            licences = Licences.objects.last()
+            num=str(int(licences.num_licences.split('-')[1])+1)
+            for i in range(len(num),10,1):
+                num="0"+num
+                
+            data['num_licences']='AT-'+num
+            activeSeason=Seasons.objects.filter(activated=True).first()
+            request.data['licence']['seasons']=activeSeason.pk
+           
+            print('aaa')
+            # user =User.objects.filter(id=data['user']).first()
+            # profile=Profile.objects.filter(user=user.pk).first()
+            # print(profile.first_name)
+            # photodata=request.data['photos']
+            # profileSerializer=ProfileSerializer(profile)
+            if data['role']==2:
+                print('athlete')
+                user=User(username=request.data['user']['username'])
+                user.set_password(request.data['user']['password'])
+                userSerializer=UserSerializer(data={'username':user.username,'password':user.password})
+                print('bbb')
+                if userSerializer.is_valid():
+                    print('ccc')
+                    userSerializer.save()
+                    print("cc")
+                    # userSerializer.data['id']
+                    request.data['profile']['user']=userSerializer.data['id']
+                    request.data['profile']['birthday']=date.today()
+                    print("c")
+                    profileSerializer=ProfileSerializer(data=request.data['profile'])
+                    print(profileSerializer.initial_data)
+                    print("d")
+                    if profileSerializer.is_valid():
+                        print('ddd')
+                        profileSerializer.save()
+                        request.data['athlete']['profile']=profileSerializer.data['id']
+                        athleteSerializer=AthleteSerializer(data=request.data['athlete'])
+                        if athleteSerializer.is_valid():
+                            print('eee')
+                            
+                            
+                    # if profileSerializer.is_valid():
+                            # print('aaa')
+                            athleteSerializer.save()
+                            request.data['licence']['user']=userSerializer.data['id']
+                            licenceserializer=LicencesSerializer(data=request.data['licence'])
+                            
+                            if licenceserializer.is_valid():
+                                print('fff')
+                                licenceserializer.save()
+                                mapdata={
+                                    'licence':licenceserializer.data,
+                                    'athlete':athleteSerializer.data,
+                                    'profile':profileSerializer.data,
+                                    'user':userSerializer.data
+                                }
+                                return JsonResponse(
+                                    mapdata
+                                    ,safe=False)
+                            else:
+                                return Response({'message licence':licenceserializer.errors},status=400)
+                                
+                        else:
+                            return Response({'message athlete':athleteSerializer.errors},status=400)
+                    else:
+                        return JsonResponse({'message profile':profileSerializer.errors},status=400)
+                else: 
+                    return JsonResponse({'message user':userSerializer.errors},status=400)
+            
+            elif data['role']==4:
+                print('coach')
+                user=User(username=request.data['user']['username'])
+                user.set_password(request.data['user']['password'])
+                userSerializer=UserSerializer(data={'username':user.username,'password':user.password})
+                print('bbb')
+                if userSerializer.is_valid():
+                    print('ccc')
+                    userSerializer.save()
+                    print("cc")
+                    # userSerializer.data['id']
+                    request.data['profile']['user']=userSerializer.data['id']
+                    request.data['profile']['birthday']=date.today()
+                    print("c")
+                    profileSerializer=ProfileSerializer(data=request.data['profile'])
+                    print(profileSerializer.initial_data)
+                    print("d")
+                    if profileSerializer.is_valid():
+                        print('ddd')
+                        profileSerializer.save()
+                        request.data['coach']['profile']=profileSerializer.data['id']
+                        coachSerializer=CoachSerializer(data=request.data['coach'])
+                        if coachSerializer.is_valid():
+                            print('eee')
+                            
+                            
+                    # if profileSerializer.is_valid():
+                            # print('aaa')
+                            coachSerializer.save()
+                            request.data['licence']['user']=userSerializer.data['id']
+                            licenceserializer=LicencesSerializer(data=request.data['licence'])
+                            
+                            if licenceserializer.is_valid():
+                                print('fff')
+                                licenceserializer.save()
+                                mapdata={
+                                    'licence':licenceserializer.data,
+                                    'coach':coachSerializer.data,
+                                    'profile':profileSerializer.data,
+                                    'user':userSerializer.data
+                                }
+                                return JsonResponse(
+                                    mapdata
+                                    ,safe=False)
+                            else:
+                                return Response({'message licence':licenceserializer.errors},status=400)
+                                
+                        else:
+                            return Response({'message coach':coachSerializer.errors},status=400)
+                    else:
+                        return JsonResponse({'message profile':profileSerializer.errors},status=400)
+                else: 
+                    return JsonResponse({'message user':userSerializer.errors},status=400)
+            elif data['role']==1:
+                print('coach')
+                user=User(username=request.data['user']['username'])
+                user.set_password(request.data['user']['password'])
+                userSerializer=UserSerializer(data={'username':user.username,'password':user.password})
+                print('bbb')
+                if userSerializer.is_valid():
+                    print('ccc')
+                    userSerializer.save()
+                    print("cc")
+                    # userSerializer.data['id']
+                    request.data['profile']['user']=userSerializer.data['id']
+                    request.data['profile']['birthday']=date.today()
+                    print("c")
+                    profileSerializer=ProfileSerializer(data=request.data['profile'])
+                    print(profileSerializer.initial_data)
+                    print("d")
+                    if profileSerializer.is_valid():
+                        print('ddd')
+                        profileSerializer.save()
+                        
+                        request.data['arbitre']['profile']=profileSerializer.data['id']
+                        arbitreSerializer=ArbitratorSerializer(data=request.data['arbitre'])
+                        if arbitreSerializer.is_valid():
+                            print('eee')
+                            
+                            
+                    # if profileSerializer.is_valid():
+                            # print('aaa')
+                            arbitreSerializer.save()
+                            request.data['licence']['user']=userSerializer.data['id']
+                            licenceserializer=LicencesSerializer(data=request.data['licence'])
+                            
+                            if licenceserializer.is_valid():
+                                print('fff')
+                                licenceserializer.save()
+                                mapdata={
+                                    'licence':licenceserializer.data,
+                                    'arbitre':arbitreSerializer.data,
+                                    'profile':profileSerializer.data,
+                                    'user':userSerializer.data
+                                }
+                                return JsonResponse(
+                                    mapdata
+                                    ,safe=False)
+                            else:
+                                return Response({'message licence':licenceserializer.errors},status=400)
+                                
+                        else:
+                            return Response({'message arbitre':arbitreSerializer.errors},status=400)
+                    else:
+                        return JsonResponse({'message profile':profileSerializer.errors},status=400)
+                else: 
+                    return JsonResponse({'message user':userSerializer.errors},status=400)
+
+                
+                
+                
+@api_view(['PUT'])
+@permission_classes([permissions.IsAuthenticated])
+@csrf_exempt
+def edit_athlete_licence(request):
+    """
+    Retrieve, update or delete a code Profile.
+    """
+    # try:
+    if request.method == 'PUT': 
+        athlete=Athlete.objects.filter(id=request.data['athlete']['id']).first()
+        athleteSerializer=AthleteSerializer(athlete,data=request.data['athlete'],partial=True)
+        if athleteSerializer.is_valid():
+            athleteSerializer.save()
+            licence=Licences.objects.filter(num_licences=request.data['licence']['num_licences']).first()
+            licenceSerializer=LicencesSerializer(licence,data=request.data['licence'],partial=True)
+            if licenceSerializer.is_valid():
+                licenceSerializer.save()
+                return JsonResponse({'athlete':athleteSerializer.data,
+                                     'licence':licenceSerializer.data
+                                     },
+                                    status=200
+                                    )
+            else:
+                print('message licence ',licenceSerializer.errors,
+                                    
+                                     )
+                return JsonResponse({'message licence':licenceSerializer.errors,
+                                    
+                                     },
+                                    status=400
+                                    )
+        else:
+            print('message athlete ',athleteSerializer.errors,
+                                    
+                                     )
+            return JsonResponse({'message athlete':athleteSerializer.errors,
+                                    
+                                     },
+                                    status=400
+                                    )
+            
+            # elif data['role']==1:
+            #     arbitrator=Arbitrator.objects.filter(profile=profile.pk).first()
+            #     arbitratorSerializer=ArbitratorSerializer(arbitrator,data=photodata,partial=True)
+            #     if arbitratorSerializer.is_valid():
+                    
+                     
+            # # if profileSerializer.is_valid():
+            #         print('aaa')
+            #         arbitratorSerializer.save()
+            #         if licence.is_valid():
+            #             print('bbb')
+            #             licence.save()
+            #             mapdata={
+            #                 'licence':licence.data,
+            #                 'photos':arbitratorSerializer.data
+            #             }
+            #             return JsonResponse(
+            #                 mapdata
+            #                 ,safe=False)
+            #         else:
+            #             return Response({'message':licenceserializer.errore},status=400)
+                        
+            #     else:
+            #         return Response({'message':arbitratorSerializer.errore},status=400)
+            
+            # elif data['role']==4:
+            #     coach=Coach.objects.filter(profile=profile.pk).first()
+            #     coachSerializer=CoachSerializer(coach,data=photodata,partial=True)
+            #     if coachSerializer.is_valid():
+            
+                    
+                     
+            # # if profileSerializer.is_valid():
+            #         print('aaa')
+            #         coachSerializer.save()
+            #         if licence.is_valid():
+            #             print('bbb')
+            #             licence.save()
+            #             mapdata={
+            #                 'licence':licence.data,
+            #                 'photos':coachSerializer.data
+            #             }
+            #             return JsonResponse(
+            #                 mapdata
+            #                 ,safe=False)
+            
+            #         else:
+            #             return Response({'message':licenceserializer.errore},status=400)
+                        
+            #     else:
+            #         return Response({'message':coachSerializer.errore},status=400)
+            # elif data['role']=="1":
+            #     print('ddddd')
+            #     return JsonResponse({"message":"aaaa"})   
+            
+            
+            
+            
                          
                               
     #                         else:

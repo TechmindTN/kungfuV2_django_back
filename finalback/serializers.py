@@ -167,6 +167,7 @@ class CompetitionSerializer(serializers.ModelSerializer):
         model = Competition
         fields = '__all__'
         
+        
 class MatchSerializer(serializers.ModelSerializer):
     class Meta:
         model = Match

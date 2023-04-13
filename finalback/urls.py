@@ -108,7 +108,10 @@ urlpatterns = [
     path('comp_list_info/',views.comp_list_info),
     path('add_matches/',views.addMatches),
     path('submit_result/<int:pk>/',views.submitResult),
-    path('clubs_list/',views.clubsList)
+    path('clubs_list/',views.clubsList),
+    path('add_full_licence/',views.add_full_licence),
+    path('edit_athlete_licence/',views.edit_athlete_licence)
+
 
 
 

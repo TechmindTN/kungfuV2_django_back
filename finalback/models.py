@@ -232,7 +232,8 @@ class Coach(models.Model):
     club = models.ForeignKey(Club,null=True, blank=True, on_delete=models.DO_NOTHING)
     category_id=models.ForeignKey(Categorie,null=True, on_delete=models.DO_NOTHING)
     weights=models.ForeignKey(Weights,null=True, on_delete=models.DO_NOTHING)
-
+    discipline=models.ForeignKey('finalback.Discipline', on_delete=models.DO_NOTHING,null=True)
+   # discipline=models.ForeignKey('finalback.Discipline',null=True, on_delete=models.DO_NOTHING)
     class Meta:
         ordering = ['created']
 
@@ -250,7 +251,7 @@ class Athlete(models.Model):
     photo = models.TextField( null=True, blank=True)
     identity_photo = models.TextField(  null=True, blank=True)
     medical_photo = models.TextField(  null=True, blank=True)
-    discipline=models.ForeignKey('finalback.Discipline', on_delete=models.DO_NOTHING)
+    discipline=models.ForeignKey('finalback.Discipline', on_delete=models.DO_NOTHING,null=True, blank=True)
     profile = models.OneToOneField(Profile, null=True, on_delete=models.CASCADE)
     weights = models.ForeignKey(Weights, null=True, on_delete=models.DO_NOTHING)
     club = models.ForeignKey(Club,null=True, blank=True, on_delete=models.DO_NOTHING)
